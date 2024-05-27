@@ -41,12 +41,18 @@ class MyAppState extends ChangeNotifier {
 
   var favourites = <WordPair>[];
 
-  void toggleFavourites() {
+  void toggleFavourites([WordPair? pair]) {
+    pair = pair ?? current;
     if (favourites.contains(current)) {
-      favourites.remove(current);
+      favourites.remove(pair);
     } else {
-      favourites.add(current);
+      favourites.add(pair);
     }
+    notifyListeners();
+  }
+
+  void removeFavourite(WordPair pair) {
+    favourites.remove(pair);
     notifyListeners();
   }
 }
@@ -61,6 +67,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    var colorScheme = Theme.of(context).colorScheme;
+
     Widget page;
     switch (selectedIndex) {
       case 0:
@@ -72,38 +80,75 @@ class _MyHomePageState extends State<MyHomePage> {
       default:
         throw UnimplementedError('No widget for $selectedIndex');
     }
-    return LayoutBuilder(builder: (context, constraints) {
-      return Scaffold(
-        body: Row(
-          children: [
-            SafeArea(
-              child: NavigationRail(
-                extended: constraints.maxWidth >= 600,
-                destinations: [
-                  NavigationRailDestination(
-                      icon: Icon(Icons.home), label: Text('Home')),
-                  NavigationRailDestination(
-                      icon: Icon(Icons.favorite), label: Text('Favorites')),
-                ],
-                selectedIndex: selectedIndex,
-                onDestinationSelected: (value) {
-                  setState(() {
-                    selectedIndex = value;
-                  });
-                  //print('Selected $value');
-                },
-              ),
-            ),
-            Expanded(
-              child: Container(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: page,
-              ),
-            ),
-          ],
-        ),
-      );
-    });
+
+    var mainArea = ColoredBox(
+      color: colorScheme.surfaceVariant,
+      child: AnimatedSwitcher(
+        duration: Duration(milliseconds: 200),
+        child: page,
+      ),
+    );
+
+    return Scaffold(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 600) {
+            return Column(
+              children: [
+                Expanded(child: mainArea),
+                SafeArea(
+                  child: BottomNavigationBar(
+                    items: [
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.home),
+                        label: 'Home',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.favorite),
+                        label: 'Favorites',
+                      ),
+                    ],
+                    currentIndex: selectedIndex,
+                    onTap: (value) {
+                      setState(() {
+                        selectedIndex = value;
+                      });
+                    },
+                  ),
+                )
+              ],
+            );
+          } else {
+            return Row(
+              children: [
+                SafeArea(
+                  child: NavigationRail(
+                    extended: constraints.maxWidth >= 800,
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.home),
+                        label: Text('Home'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.favorite),
+                        label: Text('Favourites'),
+                      ),
+                    ],
+                    selectedIndex: selectedIndex,
+                    onDestinationSelected: (value) {
+                      setState(() {
+                        selectedIndex = value;
+                      });
+                    },
+                  ),
+                ),
+                Expanded(child: mainArea),
+              ],
+            );
+          }
+        },
+      ),
+    );
   }
 }
 
@@ -184,23 +229,58 @@ class FavoritePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
+    var theme = Theme.of(context);
 
     if (appState.favourites.isEmpty) {
       return Center(
         child: Text('No favourites Yet'),
       );
     }
-    return ListView(
+    // return ListView(
+    //   children: [
+    //     Padding(
+    //       padding: const EdgeInsets.all(20),
+    //       child: Text('You have ${appState.favourites.length} favourites'),
+    //     ),
+    //     for (var pair in appState.favourites)
+    //       ListTile(
+    //         leading: Icon(Icons.favorite),
+    //         title: Text(pair.asLowerCase),
+    //       )
+    //   ],
+    // );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(30),
           child: Text('You have ${appState.favourites.length} favourites'),
         ),
-        for (var pair in appState.favourites)
-          ListTile(
-            leading: Icon(Icons.favorite),
-            title: Text(pair.asLowerCase),
-          )
+        Expanded(
+          child: GridView(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              childAspectRatio: 400 / 80,
+            ),
+            children: [
+              for (var pair in appState.favourites)
+                ListTile(
+                  leading: IconButton(
+                    icon: Icon(Icons.delete_outline, semanticLabel: 'Delete'),
+                    color: theme.colorScheme.primary,
+                    onPressed: () {
+                      appState.removeFavourite(pair);
+                    },
+                  ),
+                  title: Text(
+                    pair.asLowerCase,
+                    semanticsLabel: pair.asPascalCase,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
